@@ -1,0 +1,26 @@
+#include <sstream>
+#include <iostream>
+
+#include "server.hpp"
+
+int main(int cnt, char **args)
+{
+	unsigned int port;
+
+	if (cnt != 3)
+	{
+		std::cerr << "Please provide port and password:\n./ircserv <port> <password>" << std::endl;
+		return (0);
+	}
+
+	std::stringstream portstream(args[1]);
+	portstream >> port;
+	portstream >> std::ws;
+
+	if (portstream.fail() || !portstream.eof())
+		std::cerr << "Please provide a valid port:\n./ircserv <port> <password>" << std::endl;
+
+	Server server;
+	server.StartServer();
+	return(0);
+}
