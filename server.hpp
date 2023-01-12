@@ -6,11 +6,12 @@
 class Server
 {
 	private:
-		// unsigned int port;
+		unsigned int port;
 		// std::vector<User> users;
+		int socketfd;
 
 	public:
-		Server();
+		Server(unsigned int port);
 		~Server();
 		void StartServer();
 };
