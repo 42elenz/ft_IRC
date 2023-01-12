@@ -15,7 +15,7 @@ int main(int cnt, char **args)
 	std::stringstream portstream(args[1]);
 	portstream >> port;
 
-	if (portstream.fail() || !portstream.eof())
+	if (portstream.fail() || !portstream.eof() || port > 65535)
 		std::cerr << "Please provide a valid port:\n./ircserv <port> <password>" << std::endl;
 
 	Server server(port);
