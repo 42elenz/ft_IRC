@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <iostream>
+#include <sstream>
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <poll.h>
@@ -24,17 +25,16 @@ void Server::StartServer()
 	struct sockaddr_in addr;
 	std::vector<struct pollfd> pfds;
 	unsigned int i;
-	char buf[512];
 
 	this->socketfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (this->socketfd < 0)
 	{
-		perror("Socket creation");
+		perror("Socket");
 		return;
 	}
 	if (fcntl(this->socketfd, F_SETFL, O_NONBLOCK) == -1)
 	{
-		std::cerr << "Could not set socket to non-blocking" << std::endl;
+		perror("Fcntl");
 		return;
 	}
 	addr.sin_family = AF_INET;
@@ -45,7 +45,6 @@ void Server::StartServer()
 		perror("Bind");
 		return;
 	}
-
 	if (listen(this->socketfd, SOMAXCONN) == -1)
 	{
 		perror("Listen");
@@ -57,7 +56,11 @@ void Server::StartServer()
 	while(1)
 	{
 		i = 0;
-		poll(&(*pfds.begin()), pfds.size(), -1);
+		if (poll(&(*pfds.begin()), pfds.size(), -1) == -1)
+		{
+			perror("Poll");
+			return;
+		}
 		while (i < pfds.size())
 		{
 			if (pfds[i].revents == POLLIN)
@@ -70,12 +73,40 @@ void Server::StartServer()
 				}
 				else
 				{
-					recv(pfds[i].fd, buf, 512, 0);
-					pfds.size();
+					bufcnt = recv(pfds[i].fd, buf, 511, 0);
+					buf[bufcnt] = '\0';
+					Recieve();
 					pfds[i].events = 0;
 				}
 			}
 			i++;
 		}
 	}
+}
+
+void Server::Recieve()
+{
+	std::stringstream stream;
+	std::string str;
+
+	stream << buf;
+	while (std::getline(stream, str, '\n'))
+	{
+		Command(str);
+	}
+
+}
+
+void Server::Command(std::string cmd)
+{
+	std::stringstream stream;
+	std::string str;
+
+	stream << cmd;
+	if (str == "CAP")
+		std::cout << "C: " << str << std::endl;
+	else if (str == "NICK")
+		std::cout << "N: " << str << std::endl;
+	else if (str == "USER")
+		std::cout << "U: " << str << std::endl;
 }
