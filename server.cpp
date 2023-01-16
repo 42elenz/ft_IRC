@@ -313,10 +313,33 @@ std::string Server::ModeCmd(std::stringstream &stream, User &user)
 
 std::string Server::TopicCmd(std::stringstream &stream, User &user)
 {
-	(void) stream;
-	(void) user;
-	std::cout << "Not Implemented! " << std::endl;
-	return "";
+	std::string str;
+	std::stringstream channel_stream;
+	std::map<std::string, Channel>::pointer channel_ptr;
+
+	if (std::getline(stream, str, ' ') != NULL && (str[0] == '#' || str[0] == '&' || str[0] == '!' || str[0] == '+'))
+	{
+		str.erase(str.find_last_not_of('\r') + 1, std::string::npos);
+		channel_ptr = user.findChannel(str);
+		if (channel_ptr == NULL)
+			return ("442 ERR_NOTONCHANNEL " + str + " :You're not on that channel\r\n");
+		if (std::getline(stream, str, '\r') == NULL)
+		{
+			if (channel_ptr->second.getTopic()  == ":")
+				return ("331 RPL_NOTOPIC " + channel_ptr->first + " :No topic is set\r\n");
+			else
+				return ("332 RPL_TOPIC " + channel_ptr->first + " " + channel_ptr->second.getTopic() + "\r\n");
+		}
+		else
+		{
+			if (channel_ptr->second.isUserAllowedToChangeTopic(&user) == false)
+				return ("482 ERR_CHANOPRIVSNEEDED " + channel_ptr->first + " :You're not channel operator\r\n");
+			channel_ptr->second.setTopic(str);
+			channel_ptr->second.sendToAll(":" + user.getNick() + " TOPIC " + channel_ptr->first + " " + channel_ptr->second.getTopic() + "\r\n");
+			return ("");
+		}
+	}
+	return ("461 ERR_NEEDMOREPARAMS PART :Not enough parameters\r\n");
 }
 
 std::string Server::ListCmd(std::stringstream &stream, User &user)

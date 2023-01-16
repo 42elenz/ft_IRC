@@ -56,3 +56,19 @@ void User::sendMsg(const std::string &msg)
 	std::cout << msg;
 	send(fd_, msg.c_str(), msg.length(), 0);
 }
+
+std::map<std::string, Channel>::pointer User::findChannel(const std::string &channel_str)
+{
+	std::vector<std::map<std::string, Channel>::pointer>::iterator iter;
+
+	iter = channels.begin();
+	while(iter != channels.end())
+	{
+		if((*iter)->first == channel_str)
+			return (*iter);
+		{
+		}
+		++iter;
+	}
+	return(NULL);
+}

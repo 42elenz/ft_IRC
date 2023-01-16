@@ -27,4 +27,5 @@ class User
 		void joinChannel(std::map<std::string, Channel>::pointer channel_ptr);
 		void leaveChannel(std::map<std::string, Channel>::pointer channel_ptr);
 		void sendMsg(const std::string &msg);
+		std::map<std::string, Channel>::pointer findChannel(const std::string &channel_str);
 };
