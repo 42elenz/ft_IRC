@@ -346,6 +346,9 @@ std::string Server::ListCmd(std::stringstream &stream, User &user)
 {
 	(void) stream;
 	(void) user;
+	std::map<std::string, Channel>::iterator it = channels.begin();
+	for (; it != channels.end(); it++)
+		std::string channel_name = it->first;
 	std::cout << "Not Implemented! " << std::endl;
 	return "";
 }
