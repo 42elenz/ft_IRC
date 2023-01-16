@@ -1,16 +1,20 @@
 #pragma once
 
 #include <vector>
+#include <list>
+#include <map>
 #include "user.hpp"
+#include "channel.hpp"
 
 class Server
 {
 	private:
-		unsigned int				port;
-		std::string					password;
-		int							socketfd;
-		std::vector<struct pollfd>	pfds;
-		std::vector<User>			users;
+		unsigned int						port;
+		std::string							password;
+		int									socketfd;
+		std::vector<struct pollfd>			pfds;
+		std::list<User>						users;
+		std::map<std::string, Channel>		channels;
 
 	public:
 		Server(unsigned int port, std::string password);
@@ -18,7 +22,7 @@ class Server
 		void StartServer();
 
 	private:
-		void RemoveUser(const int &index);
+		void RemoveUser(std::vector<struct pollfd>::iterator &pfds_iter, std::list<User>::iterator &users_iter);
 		std::string Recieve(const int &fd, User &user);
 		void Send(const int &fd, std::string &reply);
 		std::string Command(const std::string &cmd, User &user);
@@ -27,7 +31,7 @@ class Server
 		std::string UserCmd(std::stringstream &stream, User &user);
 		std::string OuitCmd(std::stringstream &stream, User &user);
 		std::string JoinCmd(std::stringstream &stream, User &user);
-		std::string PingCmd(std::stringstream &stream, User &user);
+		std::string PingCmd();
 		std::string PartCmd(std::stringstream &stream, User &user);
 		std::string ModeCmd(std::stringstream &stream, User &user);
 		std::string TopicCmd(std::stringstream &stream, User &user);

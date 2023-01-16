@@ -1,17 +1,30 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include <map>
+#include <iostream>
+#include <sys/socket.h>
+
+#include "channel.hpp"
+
+class Channel;
 
 class User
 {
 	private:
-		std::string nick_;
-		std::string user_;
+		std::string													nick_;
+		std::string													user_;
+		const int													&fd_;
+		std::vector<std::map<std::string, Channel>::pointer>		channels;
 	public:
-		User();
+		User(const int &fd);
 		~User();
 		std::string getNick();
 		void setNick(std::string nick);
 		std::string getUser();
 		void setUser(std::string user);
+		void joinChannel(std::map<std::string, Channel>::pointer channel_ptr);
+		void leaveChannel(std::map<std::string, Channel>::pointer channel_ptr);
+		void sendMsg(const std::string &msg);
 };
