@@ -1,6 +1,6 @@
 #include "user.hpp"
 
-User::User(const int &fd) : nick_(), user_(), fd_(fd)
+User::User(const int &fd) : nick_(), user_(), fd_(fd), passwd(false)
 {
 
 }
@@ -71,4 +71,14 @@ std::map<std::string, Channel>::pointer User::findChannel(const std::string &cha
 		++iter;
 	}
 	return(NULL);
+}
+
+void User::setPasswd()
+{
+	passwd = true;
+}
+
+bool User::hasPasswd()
+{
+	return (passwd);
 }

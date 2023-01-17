@@ -17,6 +17,7 @@ class User
 		std::string													user_;
 		const int													&fd_;
 		std::vector<std::map<std::string, Channel>::pointer>		channels;
+		bool														passwd;
 	public:
 		User(const int &fd);
 		~User();
@@ -28,4 +29,6 @@ class User
 		void leaveChannel(std::map<std::string, Channel>::pointer channel_ptr);
 		void sendMsg(const std::string &msg);
 		std::map<std::string, Channel>::pointer findChannel(const std::string &channel_str);
+		void setPasswd();
+		bool hasPasswd();
 };

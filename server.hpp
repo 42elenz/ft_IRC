@@ -25,6 +25,7 @@ class Server
 		void RemoveUser(std::vector<struct pollfd>::iterator &pfds_iter, std::list<User>::iterator &users_iter);
 		std::string Recieve(const int &fd, User &user);
 		void Send(const int &fd, std::string &reply);
+		void RemoveUser(User &user);
 		std::string Command(const std::string &cmd, User &user);
 		std::string PassCmd(std::stringstream &stream, User &user);
 		std::string NickCmd(std::stringstream &stream, User &user);
