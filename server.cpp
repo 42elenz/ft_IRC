@@ -377,19 +377,38 @@ std::string Server::TopicCmd(std::stringstream &stream, User &user)
 
 std::string Server::ListCmd(std::stringstream &stream, User &user)
 {
+	std::string ret;
 	(void) stream;
 	(void) user;
+	ret = "321 Channel :Users Name\r\n";
 	std::map<std::string, Channel>::iterator it = channels.begin();
 	for (; it != channels.end(); it++)
-		std::string channel_name = it->first;
+		ret += "322 " + it->first + " ";
 	std::cout << "Not Implemented! " << std::endl;
 	return "";
 }
 
 std::string Server::KickCmd(std::stringstream &stream, User &user)
 {
-	(void) stream;
 	(void) user;
+	std::string channel;
+	std::string users;
+	std::string ret;
+	if ((std::getline(stream, channel, ' ') ==  NULL) || (std::getline(stream, users, ' ') == NULL))
+		return ("461 KICK :Not enough parameters\r\n");
+	stream >> channel;
+	for(std::getline(stream, channel, ',') != NULL)
+	{
+		std::map<std::string, Channel>::iterator iter;
+		iter = channels.find(channel);
+		if (iter == NULL)
+			ret = "403 " + channel + " :No such channel\r\n";
+		else
+		{
+			iter->second. 
+		}
+	}
+
 	std::cout << "Not Implemented! " << std::endl;
 	return "";
 }
