@@ -163,7 +163,7 @@ std::string Server::Command(const std::string &cmd, User &user)
 	else if (str == "USER")
 		return UserCmd(stream, user);
 	else if (str == "QUIT")
-		return OuitCmd(stream, user);
+		return OuitCmd();
 	else if (str == "JOIN")
 		return JoinCmd(stream, user);
 	else if (str == "PING")
@@ -207,70 +207,80 @@ std::string Server::NickCmd(std::stringstream &stream, User &user)
 	std::list<User>::iterator	user_iter;
 	std::string					old_nick;
 
-	if (std::getline(stream, str, ' ') != NULL)
+	if (std::getline(stream, str, ' ') == NULL)
+		return ("431 :No nickname given\r\n");
+	user_iter = users.begin();
+	while (user_iter != users.end())
 	{
-		user_iter = users.begin();
-		while (user_iter != users.end())
-		{
-			if (user_iter->getNick() == str)
-				return ("433 " + str + " :Nickname is already in use\r\n");
-				++user_iter;
-		}
-		old_nick = user.getNick();
-		user.setNick(str);
-		if (old_nick == "")
-			return ("");
-		return (":" + old_nick + " NICK " + str + "\r\n" );
+		if (user_iter->getNick() == str)
+			return ("433 " + str + " :Nickname is already in use\r\n");
+			++user_iter;
 	}
-	return ("431 :No nickname given\r\n");
+	old_nick = user.getNick();
+	user.setNick(str);
+	if (old_nick != "")
+		return (":" + old_nick + " NICK " + str + "\r\n");
+	if (user.getUser() == "")
+		return ("");
+	return (":localhost 001 " + user.getNick() + " :Welcome to the Internet Relay Network " + user.getUser() + "!" + user.getReal() + "@localhost\r\n");
 }
 
 std::string Server::UserCmd(std::stringstream &stream, User &user)
 {
-	std::string str;
+	std::string user_str;
+	std::string real_str;
 
-	if (std::getline(stream, str, ':') != NULL && std::getline(stream, str, '\0') != NULL)
-	{
-		user.setUser(str);
-		std::cout << "User '" << str << "' set." << std::endl;
-		return (":localhost 001 " + user.getNick() + " :Welcome to the Internet Relay Network "
-				+ user.getNick() + "!" + user.getUser() + "@localhost\r\n");
-	}
-	std::cout << "User command incorrect!" << std::endl;
+	if (user.getUser() != "" || user.getReal() != "")
+		return ("462 :Unauthorized command (already registered)\r\n");
+	if (std::getline(stream, user_str, ' ') == NULL || std::getline(stream, real_str, ' ') == NULL || std::getline(stream, real_str, ':') == NULL)
+		return ("461 USER :Not enough parameters\r\n");
+	std::getline(stream, real_str, '\0');
+	user.setUser(user_str);
+	user.setReal(real_str);
+	if (user.getNick() == "")
 		return ("");
+	return (":localhost 001 " + user.getNick() + " :Welcome to the Internet Relay Network " + user.getUser() + "!" + user.getReal() + "@localhost\r\n");
 }
 
-std::string Server::OuitCmd(std::stringstream &stream, User &user)
+std::string Server::OuitCmd()
 {
-	(void) stream;
-	std::cout << "User " << user.getUser() << " '" << user.getNick() << "'" << " quit the server." << std::endl;
 	return ("ERROR :terminating client connection\r\n");
 }
 
 std::string Server::JoinCmd(std::stringstream &stream, User &user)
 {
 	std::string str;
+	std::string ret;
 	std::map<std::string, Channel>::pointer channel_ptr;
 
-	if (std::getline(stream, str, ',') != NULL && (str[0] == '#' || str[0] == '&' || str[0] == '!' || str[0] == '+'))
+	if (std::getline(stream, str, ' ') == NULL)
+		return ("461 JOIN :Not enough parameters\r\n");
+	if ()
+	stream.clear();
+	stream.str(str);
+	while (std::getline(stream, str, ',') != NULL)
 	{
-		if (channels.count(str) == 0)
-		{
-			channel_ptr = &(*(channels.insert(std::make_pair<const std::string, Channel>(str, Channel(&user))).first));
-			if(str[0] == '+')
-				channel_ptr->second.setFlagT(true);
-		}
+		if (!(str[0] == '#' || str[0] == '&' || str[0] == '!' || str[0] == '+'))
+			ret += "476 " + str + " :Bad Channel Mask\r\n";
 		else
 		{
-			channel_ptr = &(*channels.find(str));
-			channel_ptr->second.addUser(&user);
+			if (channels.count(str) == 0)
+			{
+				channel_ptr = &(*(channels.insert(std::make_pair<const std::string, Channel>(str, Channel(&user))).first));
+				if(str[0] == '+')
+					channel_ptr->second.setFlagT(true);
+			}
+			else
+			{
+				channel_ptr = &(*channels.find(str));
+				channel_ptr->second.addUser(&user);
+			}
+			channel_ptr->second.sendToAll(":" + user.getNick() + " JOIN " + str + "\r\n");
+			user.joinChannel(channel_ptr);
+			ret += channel_ptr->second.nameReply(channel_ptr->first, user.getNick());
 		}
-		channel_ptr->second.sendToAll(":" + user.getNick() + " JOIN " + str + "\r\n");
-		user.joinChannel(channel_ptr);
-		return ( channel_ptr->second.nameReply(channel_ptr->first, user.getNick()) + "366 " + user.getNick() + " " + str + " :End of /NAMES list\r\n");
 	}
-	std::cout << "Not Implemented! " << std::endl;
-	return "";
+	return (ret);
 }
 
 std::string Server::PingCmd()
@@ -281,37 +291,35 @@ std::string Server::PingCmd()
 std::string Server::PartCmd(std::stringstream &stream, User &user)
 {
 	std::string str;
+	std::string msg;
 	std::string ret;
-	std::stringstream channel_stream;
 	std::map<std::string, Channel>::iterator	channel_iter;
 
-	if (std::getline(stream, str, ' ') != NULL && (str[0] == '#' || str[0] == '&' || str[0] == '!' || str[0] == '+'))
+	if (std::getline(stream, str, ' ') == NULL)
+		return ("461 PART :Not enough parameters\r\n");
+	if (std::getline(stream, msg, '\0') != NULL && msg[0] == ':')
+		msg = " " + msg;
+	else
+		msg = "";
+	stream << str;
+	while (std::getline(stream, str, ',') != NULL)
 	{
-		ret = "";
-		channel_stream << str;
-		while (std::getline(channel_stream, str, ',') != NULL && (str[0] == '#' || str[0] == '&' || str[0] == '!' || str[0] == '+'))
+		channel_iter = channels.find(str);
+		if (channel_iter == channels.end())
+			ret += user.getUser() + " " + str + " :No such channel\r\n";
+		else
 		{
-			channel_iter = channels.find(str);
-			if (channel_iter == channels.end())
-				ret = ret + user.getUser() + " " + str + " :No such channel\r\n";
+			channel_iter->second.sendToAll(":" + user.getNick() + " PART " + channel_iter->first + msg + "\r\n");
+			if (channel_iter->second.getUserCount() == 1)
+				channels.erase(channel_iter);
 			else
 			{
-				if (std::getline(stream, str, '\0') && str[0] == ':')
-					channel_iter->second.sendToAll(":" + user.getNick() + " PART " + channel_iter->first + " " + str + "\r\n");
-				else
-					channel_iter->second.sendToAll(":" + user.getNick() + " PART " + channel_iter->first + "\r\n");
-				if (channel_iter->second.getUserCount() == 1)
-					channels.erase(channel_iter);
-				else
-				{
-					channel_iter->second.removeUser(&user);
-					user.leaveChannel(&(*channel_iter));
-				}
+				channel_iter->second.removeUser(&user);
+				user.leaveChannel(&(*channel_iter));
 			}
 		}
-		return (ret);
 	}
-	return ("461 PART :Not enough parameters\r\n");
+	return (ret);
 }
 
 std::string Server::ModeCmd(std::stringstream &stream, User &user)

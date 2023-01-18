@@ -30,6 +30,16 @@ void User::setUser(std::string user)
 	user_ =  user;
 }
 
+std::string User::getReal()
+{
+	return (real_);
+}
+
+void User::setReal(std::string real)
+{
+	real_ =  real;
+}
+
 void User::joinChannel(std::map<std::string, Channel>::pointer channel_ptr)
 {
 	channels.push_back(channel_ptr);

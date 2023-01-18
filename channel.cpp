@@ -106,6 +106,6 @@ std::string Channel::nameReply(const std::string &channel_name, const std::strin
 			break;\
 		ret = ret + " ";
 	}
-	ret = ret + "\r\n";
+	ret = ret + "\r\n366 " + nick + " " + channel_name + " :End of /NAMES list\r\n";
 	return (ret);
 }
