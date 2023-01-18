@@ -209,12 +209,14 @@ std::string Server::NickCmd(std::stringstream &stream, User &user)
 
 	if (std::getline(stream, str, ' ') == NULL)
 		return ("431 :No nickname given\r\n");
+	std::cout << str << "!" << std::endl;
 	user_iter = users.begin();
 	while (user_iter != users.end())
 	{
 		if (user_iter->getNick() == str)
 			return ("433 " + str + " :Nickname is already in use\r\n");
-			++user_iter;
+		std::cout << user_iter->getNick() << "!" << std::endl;
+		++user_iter;
 	}
 	old_nick = user.getNick();
 	user.setNick(str);
@@ -255,7 +257,7 @@ std::string Server::JoinCmd(std::stringstream &stream, User &user)
 
 	if (std::getline(stream, str, ' ') == NULL)
 		return ("461 JOIN :Not enough parameters\r\n");
-	if ()
+	// if ()
 	stream.clear();
 	stream.str(str);
 	while (std::getline(stream, str, ',') != NULL)
@@ -402,6 +404,8 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 	std::string channel;
 	std::string users;
 	std::string ret;
+	std::list<User>::iterator user_iter;
+
 	if ((std::getline(stream, channel, ' ') ==  NULL) || (std::getline(stream, users, ' ') == NULL))
 		return ("461 KICK :Not enough parameters\r\n");
 	stream >> channel;
@@ -413,7 +417,26 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 			ret = "403 " + channel + " :No such channel\r\n";
 		else
 		{
-			iter->second. 
+			user_iter = users.begin();
+			while (user_iter != users.end())
+			{
+				if (user_iter->getNick() == user_str)
+				{
+					// can ber reomved
+					if (/*exists in channel*/)
+					{
+						iter->second.removeUser(&(*user_iter));
+						user_iter->leaveChannel(&(*iter));
+					}
+					else
+						// not in channel;
+				}
+				else
+					// no such user
+				&(*user_iter)
+				user_iter++;
+			}
+			iter->second.
 		}
 	}
 
