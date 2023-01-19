@@ -428,46 +428,69 @@ std::string Server::ListCmd(std::stringstream &stream, User &user)
 std::string Server::KickCmd(std::stringstream &stream, User &user)
 {
 	(void) user;
-	std::string channel;
-	std::string users;
-	std::string ret;
-	std::list<User>::iterator user_iter;
+	std::string									channel_str;
+	std::string									user_str;
+	std::string									ret;
+	std::string									reason;
+	std::stringstream							channels_stream;
+	std::stringstream							users_stream;
+	std::stringstream							part_stream;
+	std::list<User>::iterator					user_iter;
+	std::map<std::string, Channel>::iterator	channel_iter;
+	std::map<User *, bool>::pointer				ch_user_ptr;
 
-	if ((std::getline(stream, channel, ' ') ==  NULL) || (std::getline(stream, users, ' ') == NULL))
+	if ((std::getline(stream, channel_str, ' ') ==  nullptr) || (std::getline(stream, user_str, ' ') == nullptr))
 		return ("461 KICK :Not enough parameters\r\n");
-	stream >> channel;
-	// for(std::getline(stream, channel, ',') != NULL)
-	// {
-	// 	std::map<std::string, Channel>::iterator iter;
-	// 	iter = channels.find(channel);
-	// 	if (iter == NULL)
-	// 		ret = "403 " + channel + " :No such channel\r\n";
-	// 	else
-	// 	{
-	// 		user_iter = users.begin();
-	// 		while (user_iter != users.end())
-	// 		{
-	// 			// if (user_iter->getNick() == user_str)
-	// 			// {
-	// 			// 	// can ber reomved
-	// 			// 	if (/*exists in channel*/)
-	// 			// 	{
-	// 			// 		iter->second.removeUser(&(*user_iter));
-	// 			// 		user_iter->leaveChannel(&(*iter));
-	// 			// 	}
-	// 			// 	else
-	// 			// 		// not in channel;
-	// 			// }
-	// 			// else
-	// 			// 	// no such user
-	// 			// &(*user_iter)
-	// 			user_iter++;
-	// 		}
-	// 	}
-	// }
-
-	std::cout << "Not Implemented! " << std::endl;
-	return "";
+	if (std::getline(stream, reason, '\0') == nullptr || reason[0] != ':')
+		reason = ":" + user.getNick();
+	if (channel_str.find(',') != std::string::npos)
+		channels_stream << channel_str;
+	users_stream << user_str;
+	while (std::getline(users_stream, user_str, ' ') !=  nullptr)
+	{
+		if (channels_stream.str() != "")
+			if (std::getline(channels_stream, channel_str, ',') ==  nullptr)
+				return (ret + "461 KICK :Not enough parameters\r\n");
+		channel_iter = channels.find(channel_str);
+		if (channel_iter == channels.end())
+		{
+			ret += "403  " + channel_str + " :No such channel\r\n";
+			continue;
+		}
+		ch_user_ptr = channel_iter->second.findUser(user.getNick());
+		if (ch_user_ptr == nullptr)
+		{
+			ret += "442 " + channel_str + " :You're not on that channel\r\n";
+			continue;
+		}
+		if (ch_user_ptr->second == false)
+		{
+			ret += "482 " + channel_str + " :You're not channel operator\r\n";
+			continue;
+		}
+		user_iter = users.begin();
+		while (user_iter != users.end())
+		{
+			if (user_iter->getNick() == user_str)
+				break;
+			++user_iter;
+		}
+		if (user_iter == users.end())
+		{
+			ret += "441 " + user_str + " " + channel_str + " :They aren't on that channel\r\n";
+			continue;
+		}
+		channel_iter->second.sendToAll(":" + user.getNick() + " KICK " + channel_str + " " + user_str + " " + reason + "\r\n", &user);
+		ret += ":" + user.getNick() + " KICK " + channel_str + " " + user_str + " " + reason + "\r\n";
+		if (channel_iter->second.getUserCount() == 1)
+			channels.erase(channel_iter);
+		else
+		{
+			channel_iter->second.removeUser(&(*user_iter));
+			user.leaveChannel(&(*channel_iter));
+		}
+	}
+	return (ret);
 }
 
 std::string Server::PrivmsgCmd(std::stringstream &stream, User &user)
