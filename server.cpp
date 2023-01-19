@@ -106,9 +106,22 @@ void Server::StartServer()
 
 void Server::RemoveUser(std::vector<struct pollfd>::iterator &pfd_iter, std::list<User>::iterator &user_iter)
 {
-	std::cout << "User '" << user_iter->getUser() << "' (Nick '" << user_iter->getNick() << "') removed from server." << std::endl;
+	std::map<std::string, Channel>::iterator	channel_iter;
+
 	close(pfd_iter->fd);
 	pfds.erase(pfd_iter);
+	channel_iter = channels.begin();
+	while (channel_iter != channels.end())
+	{
+		if (channel_iter->second.findUser(user_iter->getNick()) != NULL)
+		{
+			if (channel_iter->second.getUserCount() == 1)
+				channels.erase(channel_iter);
+			else
+				channel_iter->second.removeUser(&(*user_iter));
+		}
+		++channel_iter;
+	}
 	users.erase(user_iter);
 }
 
@@ -319,13 +332,11 @@ std::string Server::PartCmd(std::stringstream &stream, User &user)
 		{
 			channel_iter->second.sendToAll(":" + user.getNick() + " PART " + channel_iter->first + msg + "\r\n", &user);
 			ret += ":" + user.getNick() + " PART " + channel_iter->first + msg + "\r\n";
+			user.leaveChannel(&(*channel_iter));
 			if (channel_iter->second.getUserCount() == 1)
 				channels.erase(channel_iter);
 			else
-			{
 				channel_iter->second.removeUser(&user);
-				user.leaveChannel(&(*channel_iter));
-			}
 		}
 	}
 	return (ret);
@@ -339,41 +350,45 @@ std::string Server::ModeCmd(std::stringstream &stream, User &user)
 	std::string									param_str;
 	std::map<User *, bool>::pointer				user_ptr;
 
-	if (std::getline(stream, channel_str, ' ') == nullptr || !(channel_str[0] == '#' || channel_str[0] == '&' || channel_str[0] == '!' || channel_str[0] == '+'))
+	if (std::getline(stream, channel_str, ' ') == NULL || !(channel_str[0] == '#' || channel_str[0] == '&' || channel_str[0] == '!' || channel_str[0] == '+'))
 		return ("461 MODE :Not enough parameters\r\n");
 	channel_ptr = user.findChannel(channel_str);
 	if (channel_str[0] == '+')
 		return ("477 " + channel_str + " :Channel doesn't support modes\r\n");
-	// if (channel_ptr == nullptr || channel_ptr->second.isUserChannelOperator(&user) == false)
-	return ("324 " + channel_str + " -o " + user.getNick() + "\r\n");
-
-	while (std::getline(stream, mode_str, ' ') != nullptr)
+	if (stream.str().find(' ') != std::string::npos)
+	{
+		if (channel_ptr->second.isUserChannelOperator(&user) == false)
+			return ("324 " + channel_str + " -o " + user.getNick() + "\r\n");
+		else
+			return ("324 " + channel_str + " +o " + user.getNick() + "\r\n");
+	}
+	while (std::getline(stream, mode_str, ' ') != NULL)
 	{
 		if (mode_str == "+t")
 			channel_ptr->second.setFlagT(true);
 		else if (mode_str == "-t")
 			channel_ptr->second.setFlagT(false);
-		else if (mode_str == "-o" && std::getline(stream, param_str, ' ') != nullptr)
+		else if (mode_str == "-o" && std::getline(stream, param_str, ' ') != NULL)
 		{
 			if (param_str == user.getNick())
 				channel_ptr->second.setUserChannelOperator(&user, false);
 			else
 			{
 				user_ptr = channel_ptr->second.findUser(param_str);
-				if (user_ptr == nullptr)
+				if (user_ptr == NULL)
 					return ("441 " + param_str + " " + channel_str + " :They aren't on that channel\r\n");
 				else
 					user_ptr->second = false;
 			}
 		}
-		else if (mode_str == "+o" && std::getline(stream, param_str, ' ') != nullptr && channel_ptr->second.isUserChannelOperator(&user))
+		else if (mode_str == "+o" && std::getline(stream, param_str, ' ') != NULL && channel_ptr->second.isUserChannelOperator(&user))
 		{
 			if (param_str == user.getNick())
 				channel_ptr->second.setUserChannelOperator(&user, true);
 			else
 			{
 				user_ptr = channel_ptr->second.findUser(param_str);
-				if (user_ptr == nullptr)
+				if (user_ptr == NULL)
 					return ("441 " + param_str + " " + channel_str + " :They aren't on that channel\r\n");
 				else
 					user_ptr->second = true;
@@ -439,17 +454,17 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 	std::map<std::string, Channel>::iterator	channel_iter;
 	std::map<User *, bool>::pointer				ch_user_ptr;
 
-	if ((std::getline(stream, channel_str, ' ') ==  nullptr) || (std::getline(stream, user_str, ' ') == nullptr))
+	if ((std::getline(stream, channel_str, ' ') ==  NULL) || (std::getline(stream, user_str, ' ') == NULL))
 		return ("461 KICK :Not enough parameters\r\n");
-	if (std::getline(stream, reason, '\0') == nullptr || reason[0] != ':')
+	if (std::getline(stream, reason, '\0') == NULL || reason[0] != ':')
 		reason = ":" + user.getNick();
 	if (channel_str.find(',') != std::string::npos)
 		channels_stream << channel_str;
 	users_stream << user_str;
-	while (std::getline(users_stream, user_str, ' ') !=  nullptr)
+	while (std::getline(users_stream, user_str, ' ') !=  NULL)
 	{
 		if (channels_stream.str() != "")
-			if (std::getline(channels_stream, channel_str, ',') ==  nullptr)
+			if (std::getline(channels_stream, channel_str, ',') ==  NULL)
 				return (ret + "461 KICK :Not enough parameters\r\n");
 		channel_iter = channels.find(channel_str);
 		if (channel_iter == channels.end())
@@ -458,7 +473,7 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 			continue;
 		}
 		ch_user_ptr = channel_iter->second.findUser(user.getNick());
-		if (ch_user_ptr == nullptr)
+		if (ch_user_ptr == NULL)
 		{
 			ret += "442 " + channel_str + " :You're not on that channel\r\n";
 			continue;
@@ -482,13 +497,11 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 		}
 		channel_iter->second.sendToAll(":" + user.getNick() + " KICK " + channel_str + " " + user_str + " " + reason + "\r\n", &user);
 		ret += ":" + user.getNick() + " KICK " + channel_str + " " + user_str + " " + reason + "\r\n";
+		user.leaveChannel(&(*channel_iter));
 		if (channel_iter->second.getUserCount() == 1)
 			channels.erase(channel_iter);
 		else
-		{
 			channel_iter->second.removeUser(&(*user_iter));
-			user.leaveChannel(&(*channel_iter));
-		}
 	}
 	return (ret);
 }
@@ -498,20 +511,20 @@ std::string Server::PrivmsgCmd(std::stringstream &stream, User &user)
 	std::string									recipent;
 	std::string									msg;
 	std::string									ret;
-	std::map<std::string, Channel>::iterator	channel_iter;
+	std::map<std::string, Channel>::pointer		channel_ptr;
 	std::list<User>::iterator					user_iter;
 	std::stringstream							rep_stream;
 
-	if (std::getline(stream, recipent, ' ') == nullptr || (std::getline(stream, msg, '\0') == nullptr && msg[0] != ':'))
+	if (std::getline(stream, recipent, ' ') == NULL || (std::getline(stream, msg, '\0') == NULL && msg[0] != ':'))
 		return ("461 PRIVMSG :Not enough parameters\r\n");
 	rep_stream << recipent;
-	while (std::getline(rep_stream, recipent, ',') != nullptr)
+	while (std::getline(rep_stream, recipent, ',') != NULL)
 	{
 		if (recipent[0] == '#' || recipent[0] == '&' || recipent[0] == '!' || recipent[0] == '+')
 		{
-			channel_iter = channels.find(recipent);
-			if (channel_iter != channels.end())
-				channel_iter->second.sendToAll(":" + user.getNick() + " PRIVMSG " + recipent + " " + msg + "\r\n", &user);
+			channel_ptr = user.findChannel(recipent);
+			if (channel_ptr != NULL)
+				channel_ptr->second.sendToAll(":" + user.getNick() + " PRIVMSG " + recipent + " " + msg + "\r\n", &user);
 			else
 				ret += "401 " + recipent + " :No such nick/channel\r\n";
 		}
@@ -542,10 +555,10 @@ std::string Server::NoticeCmd(std::stringstream &stream, User &user)
 	std::list<User>::iterator					user_iter;
 	std::stringstream							rep_stream;
 
-	if (std::getline(stream, recipent, ' ') == nullptr || (std::getline(stream, msg, '\0') == nullptr && msg[0] != ':'))
+	if (std::getline(stream, recipent, ' ') == NULL || (std::getline(stream, msg, '\0') == NULL && msg[0] != ':'))
 		return ("461 NOTICE :Not enough parameters\r\n");
 	rep_stream << recipent;
-	while (std::getline(rep_stream, recipent, ',') != nullptr)
+	while (std::getline(rep_stream, recipent, ',') != NULL)
 	{
 		if (recipent[0] == '#' || recipent[0] == '&' || recipent[0] == '!' || recipent[0] == '+')
 		{

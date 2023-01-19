@@ -42,7 +42,6 @@ void Channel::sendToAll(const std::string &msg, User *user)
 	iter = users.begin();
 	while (iter != users.end())
 	{
-		std::cout << user << " " << iter->first << " " << users.size() << std::endl;
 		if (user != iter->first)
 			iter->first->sendMsg(msg);
 		++iter;
