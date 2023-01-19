@@ -58,7 +58,7 @@ void Server::StartServer()
 	pfds[0].events = POLLIN;
 	while(1)
 	{
-		std::cout << "Poll." << std::endl;
+		std::cout << "Poll. Channels: " << channels.size() << " Users: " << users.size() <<std::endl;
 		if (poll(&(*pfds.begin()), pfds.size(), -1) == -1)
 		{
 			perror("Poll");
@@ -157,7 +157,7 @@ std::string Server::Command(const std::string &cmd, User &user)
 	if (str[0] == ':')
 		std::getline(stream, str, ' ');
 	if (str == "PASS")
-		return ("462 :Unauthorized command (already registered)");
+		return ("462 :Unauthorized command (already registered)\r\n");
 	else if (str == "NICK")
 		return NickCmd(stream, user);
 	else if (str == "USER")
@@ -209,22 +209,25 @@ std::string Server::NickCmd(std::stringstream &stream, User &user)
 
 	if (std::getline(stream, str, ' ') == NULL)
 		return ("431 :No nickname given\r\n");
-	std::cout << str << "!" << std::endl;
 	user_iter = users.begin();
 	while (user_iter != users.end())
 	{
 		if (user_iter->getNick() == str)
+		{
+			user.setFail(str);
 			return ("433 " + str + " :Nickname is already in use\r\n");
-		std::cout << user_iter->getNick() << "!" << std::endl;
+		}
 		++user_iter;
 	}
 	old_nick = user.getNick();
 	user.setNick(str);
 	if (old_nick != "")
 		return (":" + old_nick + " NICK " + str + "\r\n");
+	if (user.getFail() != "" && user.getNick() == "")
+		old_nick = (":" + user.getFail() + " NICK " + str + "\r\n");
 	if (user.getUser() == "")
 		return ("");
-	return (":localhost 001 " + user.getNick() + " :Welcome to the Internet Relay Network " + user.getUser() + "!" + user.getReal() + "@localhost\r\n");
+	return (old_nick + ":localhost 001 " + user.getNick() + " :Welcome to the Internet Relay Network " + user.getNick() + "!" + user.getUser() + "@localhost\r\n");
 }
 
 std::string Server::UserCmd(std::stringstream &stream, User &user)
@@ -241,7 +244,7 @@ std::string Server::UserCmd(std::stringstream &stream, User &user)
 	user.setReal(real_str);
 	if (user.getNick() == "")
 		return ("");
-	return (":localhost 001 " + user.getNick() + " :Welcome to the Internet Relay Network " + user.getUser() + "!" + user.getReal() + "@localhost\r\n");
+	return (":localhost 001 " + user.getNick() + " :Welcome to the Internet Relay Network " + user.getNick() + "!" + user.getUser() + "@localhost\r\n");
 }
 
 std::string Server::OuitCmd()
@@ -275,10 +278,12 @@ std::string Server::JoinCmd(std::stringstream &stream, User &user)
 			else
 			{
 				channel_ptr = &(*channels.find(str));
-				channel_ptr->second.addUser(&user);
+				if (channel_ptr->second.addUser(&user) == false)
+					continue;
 			}
-			channel_ptr->second.sendToAll(":" + user.getNick() + " JOIN " + str + "\r\n");
+			channel_ptr->second.sendToAll(":" + user.getNick() + " JOIN " + str + "\r\n", &user);
 			user.joinChannel(channel_ptr);
+			ret += ":" + user.getNick() + " JOIN " + str + "\r\n";
 			ret += channel_ptr->second.nameReply(channel_ptr->first, user.getNick());
 		}
 	}
@@ -303,15 +308,17 @@ std::string Server::PartCmd(std::stringstream &stream, User &user)
 		msg = " " + msg;
 	else
 		msg = "";
+	stream.clear();
 	stream << str;
-	while (std::getline(stream, str, ',') != NULL)
+	while (std::getline(stream, str, ' ') != NULL)
 	{
 		channel_iter = channels.find(str);
 		if (channel_iter == channels.end())
 			ret += user.getUser() + " " + str + " :No such channel\r\n";
 		else
 		{
-			channel_iter->second.sendToAll(":" + user.getNick() + " PART " + channel_iter->first + msg + "\r\n");
+			channel_iter->second.sendToAll(":" + user.getNick() + " PART " + channel_iter->first + msg + "\r\n", &user);
+			ret += ":" + user.getNick() + " PART " + channel_iter->first + msg + "\r\n";
 			if (channel_iter->second.getUserCount() == 1)
 				channels.erase(channel_iter);
 			else
@@ -326,34 +333,56 @@ std::string Server::PartCmd(std::stringstream &stream, User &user)
 
 std::string Server::ModeCmd(std::stringstream &stream, User &user)
 {
-	std::string 								str;
 	std::map<std::string, Channel>::pointer		channel_ptr;
+	std::string									channel_str;
+	std::string									mode_str;
+	std::string									param_str;
+	std::map<User *, bool>::pointer				user_ptr;
 
-	if (std::getline(stream, str, ' ') != NULL && (str[0] == '#' || str[0] == '&' || str[0] == '!' || str[0] == '+'))
+	if (std::getline(stream, channel_str, ' ') == nullptr || !(channel_str[0] == '#' || channel_str[0] == '&' || channel_str[0] == '!' || channel_str[0] == '+'))
+		return ("461 MODE :Not enough parameters\r\n");
+	channel_ptr = user.findChannel(channel_str);
+	if (channel_str[0] == '+')
+		return ("477 " + channel_str + " :Channel doesn't support modes\r\n");
+	// if (channel_ptr == nullptr || channel_ptr->second.isUserChannelOperator(&user) == false)
+	return ("324 " + channel_str + " -o " + user.getNick() + "\r\n");
+
+	while (std::getline(stream, mode_str, ' ') != nullptr)
 	{
-		channel_ptr = user.findChannel(str);
-		if (str[0] == '+')
-			return ("477 " + str + " :Channel doesn't support modes\r\n");
-		if (channel_ptr == NULL || channel_ptr->second.isUserChannelOperator(&user) == false)
-			return ("482 " + str + " :You're not channel operator\r\n");
-		while (std::getline(stream, str, ' ') != NULL)
+		if (mode_str == "+t")
+			channel_ptr->second.setFlagT(true);
+		else if (mode_str == "-t")
+			channel_ptr->second.setFlagT(false);
+		else if (mode_str == "-o" && std::getline(stream, param_str, ' ') != nullptr)
 		{
-			if (str == "+t")
-				channel_ptr->second.setFlagT(true);
-			else if (str == "-t")
-				channel_ptr->second.setFlagT(false);
-			else if (str == "-o" && std::getline(stream, str, ' ') != NULL)
+			if (param_str == user.getNick())
+				channel_ptr->second.setUserChannelOperator(&user, false);
+			else
 			{
-				if (str == user.getNick())
-					channel_ptr->second.setUserChannelOperator(&user, false); // part missing TODO
-			}
-			else if (str == "+o" && std::getline(stream, str, ' ') != NULL && channel_ptr->second.isUserChannelOperator(&user))
-			{
-				channel_ptr->second.setUserChannelOperator(&user, true); // Incorrect TODO
+				user_ptr = channel_ptr->second.findUser(param_str);
+				if (user_ptr == nullptr)
+					return ("441 " + param_str + " " + channel_str + " :They aren't on that channel\r\n");
+				else
+					user_ptr->second = false;
 			}
 		}
+		else if (mode_str == "+o" && std::getline(stream, param_str, ' ') != nullptr && channel_ptr->second.isUserChannelOperator(&user))
+		{
+			if (param_str == user.getNick())
+				channel_ptr->second.setUserChannelOperator(&user, true);
+			else
+			{
+				user_ptr = channel_ptr->second.findUser(param_str);
+				if (user_ptr == nullptr)
+					return ("441 " + param_str + " " + channel_str + " :They aren't on that channel\r\n");
+				else
+					user_ptr->second = true;
+			}
+		}
+		else
+			return ("472 " + mode_str + " " + param_str + " :is unknown to me\r\n");
 	}
-	return ("461 MODE :Not enough parameters\r\n");
+	return ("324 " + channel_str + " " + mode_str + " " + param_str + "\r\n");
 }
 
 std::string Server::TopicCmd(std::stringstream &stream, User &user)
@@ -361,28 +390,26 @@ std::string Server::TopicCmd(std::stringstream &stream, User &user)
 	std::string str;
 	std::map<std::string, Channel>::pointer channel_ptr;
 
-	if (std::getline(stream, str, ' ') != NULL && (str[0] == '#' || str[0] == '&' || str[0] == '!' || str[0] == '+'))
+	if (std::getline(stream, str, ' ') == NULL || !(str[0] == '#' || str[0] == '&' || str[0] == '!' || str[0] == '+'))
+		return ("461 PART :Not enough parameters\r\n");
+	channel_ptr = user.findChannel(str);
+	if (channel_ptr == NULL)
+		return ("442 " + str + " :You're not on that channel\r\n");
+	if (std::getline(stream, str, '\0') == NULL)
 	{
-		channel_ptr = user.findChannel(str);
-		if (channel_ptr == NULL)
-			return ("442 " + str + " :You're not on that channel\r\n");
-		if (std::getline(stream, str, '\0') == NULL)
-		{
-			if (channel_ptr->second.getTopic()  == ":")
-				return ("331 " + channel_ptr->first + " :No topic is set\r\n");
-			else
-				return ("332 " + channel_ptr->first + " " + channel_ptr->second.getTopic() + "\r\n");
-		}
+		if (channel_ptr->second.getTopic()  == ":")
+			return ("331 " + channel_ptr->first + " :No topic is set\r\n");
 		else
-		{
-			if (channel_ptr->second.isUserAllowedToChangeTopic(&user) == false)
-				return ("482 " + channel_ptr->first + " :You're not channel operator\r\n");
-			channel_ptr->second.setTopic(str);
-			channel_ptr->second.sendToAll(":" + user.getNick() + " TOPIC " + channel_ptr->first + " " + channel_ptr->second.getTopic() + "\r\n");
-			return ("");
-		}
+			return ("332 " + channel_ptr->first + " " + channel_ptr->second.getTopic() + "\r\n");
 	}
-	return ("461 PART :Not enough parameters\r\n");
+	else
+	{
+		if (channel_ptr->second.isUserAllowedToChangeTopic(&user) == false)
+			return ("482 " + channel_ptr->first + " :You're not channel operator\r\n");
+		channel_ptr->second.setTopic(str);
+		channel_ptr->second.sendToAll(":" + user.getNick() + " TOPIC " + channel_ptr->first + " " + channel_ptr->second.getTopic() + "\r\n", &user);
+		return ("");
+	}
 }
 
 std::string Server::ListCmd(std::stringstream &stream, User &user)
@@ -409,36 +436,35 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 	if ((std::getline(stream, channel, ' ') ==  NULL) || (std::getline(stream, users, ' ') == NULL))
 		return ("461 KICK :Not enough parameters\r\n");
 	stream >> channel;
-	for(std::getline(stream, channel, ',') != NULL)
-	{
-		std::map<std::string, Channel>::iterator iter;
-		iter = channels.find(channel);
-		if (iter == NULL)
-			ret = "403 " + channel + " :No such channel\r\n";
-		else
-		{
-			user_iter = users.begin();
-			while (user_iter != users.end())
-			{
-				if (user_iter->getNick() == user_str)
-				{
-					// can ber reomved
-					if (/*exists in channel*/)
-					{
-						iter->second.removeUser(&(*user_iter));
-						user_iter->leaveChannel(&(*iter));
-					}
-					else
-						// not in channel;
-				}
-				else
-					// no such user
-				&(*user_iter)
-				user_iter++;
-			}
-			iter->second.
-		}
-	}
+	// for(std::getline(stream, channel, ',') != NULL)
+	// {
+	// 	std::map<std::string, Channel>::iterator iter;
+	// 	iter = channels.find(channel);
+	// 	if (iter == NULL)
+	// 		ret = "403 " + channel + " :No such channel\r\n";
+	// 	else
+	// 	{
+	// 		user_iter = users.begin();
+	// 		while (user_iter != users.end())
+	// 		{
+	// 			// if (user_iter->getNick() == user_str)
+	// 			// {
+	// 			// 	// can ber reomved
+	// 			// 	if (/*exists in channel*/)
+	// 			// 	{
+	// 			// 		iter->second.removeUser(&(*user_iter));
+	// 			// 		user_iter->leaveChannel(&(*iter));
+	// 			// 	}
+	// 			// 	else
+	// 			// 		// not in channel;
+	// 			// }
+	// 			// else
+	// 			// 	// no such user
+	// 			// &(*user_iter)
+	// 			user_iter++;
+	// 		}
+	// 	}
+	// }
 
 	std::cout << "Not Implemented! " << std::endl;
 	return "";
@@ -446,16 +472,80 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 
 std::string Server::PrivmsgCmd(std::stringstream &stream, User &user)
 {
-	(void) stream;
-	(void) user;
-	std::cout << "Not Implemented! " << std::endl;
-	return "";
+	std::string									recipent;
+	std::string									msg;
+	std::string									ret;
+	std::map<std::string, Channel>::iterator	channel_iter;
+	std::list<User>::iterator					user_iter;
+	std::stringstream							rep_stream;
+
+	if (std::getline(stream, recipent, ' ') == nullptr || (std::getline(stream, msg, '\0') == nullptr && msg[0] != ':'))
+		return ("461 PRIVMSG :Not enough parameters\r\n");
+	rep_stream << recipent;
+	while (std::getline(rep_stream, recipent, ',') != nullptr)
+	{
+		if (recipent[0] == '#' || recipent[0] == '&' || recipent[0] == '!' || recipent[0] == '+')
+		{
+			channel_iter = channels.find(recipent);
+			if (channel_iter != channels.end())
+				channel_iter->second.sendToAll(":" + user.getNick() + " PRIVMSG " + recipent + " " + msg + "\r\n", &user);
+			else
+				ret += "401 " + recipent + " :No such nick/channel\r\n";
+		}
+		else
+		{
+			user_iter = users.begin();
+			while (user_iter != users.end())
+			{
+				if (user_iter->getNick() == recipent)
+				{
+					user_iter->sendMsg(":" + user.getNick() + " PRIVMSG " + recipent + " " + msg + "\r\n");
+					break;
+				}
+				++user_iter;
+			}
+			ret += "401 " + recipent + " :No such nick/channel\r\n";
+		}
+	}
+	return (ret);
 }
 
 std::string Server::NoticeCmd(std::stringstream &stream, User &user)
 {
-	(void) stream;
-	(void) user;
-	std::cout << "Not Implemented! " << std::endl;
-	return "";
+	std::string									recipent;
+	std::string									msg;
+	std::string									ret;
+	std::map<std::string, Channel>::iterator	channel_iter;
+	std::list<User>::iterator					user_iter;
+	std::stringstream							rep_stream;
+
+	if (std::getline(stream, recipent, ' ') == nullptr || (std::getline(stream, msg, '\0') == nullptr && msg[0] != ':'))
+		return ("461 NOTICE :Not enough parameters\r\n");
+	rep_stream << recipent;
+	while (std::getline(rep_stream, recipent, ',') != nullptr)
+	{
+		if (recipent[0] == '#' || recipent[0] == '&' || recipent[0] == '!' || recipent[0] == '+')
+		{
+			channel_iter = channels.find(recipent);
+			if (channel_iter != channels.end())
+				channel_iter->second.sendToAll(":" + user.getNick() + " NOTICE " + recipent + " " + msg + "\r\n", &user);
+			else
+				ret += "401 " + recipent + " :No such nick/channel\r\n";
+		}
+		else
+		{
+			user_iter = users.begin();
+			while (user_iter != users.end())
+			{
+				if (user_iter->getNick() == recipent)
+				{
+					user_iter->sendMsg(":" + user.getNick() + " NOTICE " + recipent + " " + msg + "\r\n");
+					break;
+				}
+				++user_iter;
+			}
+			ret += "401 " + recipent + " :No such nick/channel\r\n";
+		}
+	}
+	return (ret);
 }

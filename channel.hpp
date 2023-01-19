@@ -15,12 +15,13 @@ class Channel
 	public:
 		Channel(User *first_user);
 		~Channel();
-		void addUser(User *user);
+		bool addUser(User *user);
 		void removeUser(User *user);
+		std::map<User *, bool>::pointer findUser(std::string user);
 		int getUserCount();
 		void setTopic(const std::string &topic);
 		std::string getTopic();
-		void sendToAll(const std::string &msg);
+		void sendToAll(const std::string &msg, User *user);
 		void setFlagT(const bool &flag);
 		bool isUserAllowedToChangeTopic(User *user);
 		bool isUserChannelOperator(User *user);

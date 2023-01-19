@@ -40,6 +40,16 @@ void User::setReal(std::string real)
 	real_ =  real;
 }
 
+std::string User::getFail()
+{
+	return (fail_);
+}
+
+void User::setFail(std::string fail)
+{
+	fail_ =  fail;
+}
+
 void User::joinChannel(std::map<std::string, Channel>::pointer channel_ptr)
 {
 	channels.push_back(channel_ptr);

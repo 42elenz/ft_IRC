@@ -16,6 +16,7 @@ class User
 		std::string													nick_;
 		std::string													user_;
 		std::string													real_;
+		std::string													fail_;
 		const int													&fd_;
 		std::vector<std::map<std::string, Channel>::pointer>		channels;
 		bool														passwd;
@@ -28,6 +29,8 @@ class User
 		void setUser(std::string user);
 		std::string getReal();
 		void setReal(std::string real);
+		std::string getFail();
+		void setFail(std::string nick);
 		void joinChannel(std::map<std::string, Channel>::pointer channel_ptr);
 		void leaveChannel(std::map<std::string, Channel>::pointer channel_ptr);
 		void sendMsg(const std::string &msg);
