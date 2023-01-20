@@ -58,7 +58,7 @@ void Server::StartServer()
 	pfds[0].events = POLLIN;
 	while(1)
 	{
-		std::cout << "Poll. Channels: " << channels.size() << " Users: " << users.size() <<std::endl;
+		std::cout << "\nPoll. Channels: " << channels.size() << " Users: " << users.size() <<std::endl;
 		if (poll(&(*pfds.begin()), pfds.size(), -1) == -1)
 		{
 			perror("Poll");
@@ -136,7 +136,7 @@ std::string Server::Recieve(const int &fd, User &user)
 	ret = "";
 	bufcnt = recv(fd, buf, 511, 0);
 	buf[bufcnt] = '\0';
-	std::cout << "Buffer: " << buf << std::endl;
+	std::cout << "Buffer: " << buf;
 	stream << buf;
 	while (std::getline(stream, str, '\n'))
 	{
@@ -148,7 +148,7 @@ std::string Server::Recieve(const int &fd, User &user)
 
 void Server::Send(const int &fd, std::string &reply)
 {
-	std::cout << "_________________\nOutgoing commands\n\n" << reply << "_________________\n" << std::endl;
+	std::cout << reply;
 	send(fd, reply.c_str(), reply.length(), 0);
 }
 
@@ -298,6 +298,7 @@ std::string Server::JoinCmd(std::stringstream &stream, User &user)
 			user.joinChannel(channel_ptr);
 			ret += ":" + user.getNick() + " JOIN " + str + "\r\n";
 			ret += channel_ptr->second.nameReply(channel_ptr->first, user.getNick());
+			ret += ":irc_bot NOTICE " + str + " :Welcome to the channel. Be polite and don't insult other users!\r\n";
 		}
 	}
 	return (ret);
@@ -358,9 +359,9 @@ std::string Server::ModeCmd(std::stringstream &stream, User &user)
 	if (stream.str().find(' ') != std::string::npos)
 	{
 		if (channel_ptr->second.isUserChannelOperator(&user) == false)
-			return ("324 " + channel_str + " -o " + user.getNick() + "\r\n");
+			return ("324 " + channel_str + " -m -o " + user.getNick() + "\r\n");
 		else
-			return ("324 " + channel_str + " +o " + user.getNick() + "\r\n");
+			return ("324 " + channel_str + " -m +o " + user.getNick() + "\r\n");
 	}
 	while (std::getline(stream, mode_str, ' ') != NULL)
 	{
@@ -526,7 +527,7 @@ std::string Server::PrivmsgCmd(std::stringstream &stream, User &user)
 			if (channel_ptr != NULL)
 				channel_ptr->second.sendToAll(":" + user.getNick() + " PRIVMSG " + recipent + " " + msg + "\r\n", &user);
 			else
-				ret += "401 " + recipent + " :No such nick/channel\r\n";
+				ret += "401 " + recipent + " :No such channel\r\n";
 		}
 		else
 		{
@@ -540,7 +541,8 @@ std::string Server::PrivmsgCmd(std::stringstream &stream, User &user)
 				}
 				++user_iter;
 			}
-			ret += "401 " + recipent + " :No such nick/channel\r\n";
+			if (user_iter == users.end())
+				ret += "401 " + recipent + " :No such nick\r\n";
 		}
 	}
 	return (ret);
@@ -566,7 +568,7 @@ std::string Server::NoticeCmd(std::stringstream &stream, User &user)
 			if (channel_iter != channels.end())
 				channel_iter->second.sendToAll(":" + user.getNick() + " NOTICE " + recipent + " " + msg + "\r\n", &user);
 			else
-				ret += "401 " + recipent + " :No such nick/channel\r\n";
+				ret += "401 " + recipent + " :No such channel\r\n";
 		}
 		else
 		{
@@ -580,7 +582,8 @@ std::string Server::NoticeCmd(std::stringstream &stream, User &user)
 				}
 				++user_iter;
 			}
-			ret += "401 " + recipent + " :No such nick/channel\r\n";
+			if (user_iter == users.end())
+				ret += "401 " + recipent + " :No such nick\r\n";
 		}
 	}
 	return (ret);

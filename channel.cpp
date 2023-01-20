@@ -42,8 +42,11 @@ void Channel::sendToAll(const std::string &msg, User *user)
 	iter = users.begin();
 	while (iter != users.end())
 	{
+		std::cout << iter->first->getNick() << "!! ";
 		if (user != iter->first)
 			iter->first->sendMsg(msg);
+		else
+			std::cout << " except\n";
 		++iter;
 	}
 }
