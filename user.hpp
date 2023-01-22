@@ -5,6 +5,8 @@
 #include <map>
 #include <iostream>
 #include <sys/socket.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "channel.hpp"
 
@@ -17,7 +19,7 @@ class User
 		std::string													user_;
 		std::string													real_;
 		std::string													fail_;
-		const int													&fd_;
+		const int													fd_;
 		std::vector<std::map<std::string, Channel>::pointer>		channels;
 		bool														passwd;
 	public:
@@ -37,4 +39,5 @@ class User
 		std::map<std::string, Channel>::pointer findChannel(const std::string &channel_str);
 		void setPasswd();
 		bool hasPasswd();
+		void closeFd();
 };

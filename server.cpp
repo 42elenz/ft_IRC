@@ -1,13 +1,5 @@
 #include "server.hpp"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <iostream>
-#include <sstream>
-#include <fcntl.h>
-#include <arpa/inet.h>
-#include <poll.h>
-#include <stdio.h>
-#include <unistd.h>
+
 
 Server::Server(unsigned int port, std::string password) : port(port), password(password), socketfd(-1)
 {
@@ -18,6 +10,12 @@ Server::~Server()
 {
 	if (socketfd != -1)
 		close(socketfd);
+	std::list<User>::iterator user_iter = users.begin();
+	while (user_iter != users.end())
+	{
+		user_iter->closeFd();
+		++user_iter;
+	}
 	std::cout << "Server terminated." << std::endl;
 }
 
@@ -430,20 +428,52 @@ std::string Server::TopicCmd(std::stringstream &stream, User &user)
 
 std::string Server::ListCmd(std::stringstream &stream, User &user)
 {
-	std::string ret;
-	(void) stream;
 	(void) user;
-	ret = "321 Channel :Users Name\r\n";
-	std::map<std::string, Channel>::iterator it = channels.begin();
-	for (; it != channels.end(); it++)
-		ret += "322 " + it->first + " ";
-	std::cout << "Not Implemented! " << std::endl;
-	return "";
+	std::string ret;
+	std::string str;
+	std::string topic;
+	std::string channel;
+	std::stringstream	channels_stream;
+	std::map<std::string, Channel>::iterator ch_iter;
+
+	std::getline(stream, str, ' ');
+	std::cout<<"STUFF" << str << std::endl;
+	std::cout<<"LENGT" << str.length() << std::endl;
+	if (str.length() == 0)
+	{
+		for(ch_iter = channels.begin(); ch_iter != channels.end(); ch_iter++)
+		{
+			topic = ch_iter->second.getTopic().substr(1);
+			if (topic.length() == 0)
+				topic = ":";
+			std::string count = SSTR(ch_iter->second.getUserCount());
+			ret += "322 " + ch_iter->first.substr(1) + " " + "#" + count + " " + topic + "\r\n";
+		}
+	}
+	else
+	{
+		std::cout << "THATS TEH STRING BEFORE" << str <<std::endl;
+		channels_stream << str;
+		std::cout << "THATS TEH STRING AFTER" << str <<std::endl;
+		while(std::getline(channels_stream, channel, ','))
+		{
+			ch_iter = channels.find(channel);
+			std::cout << "THATS TEH STRING " << channel <<std::endl;
+			if(ch_iter != channels.end())
+			{
+				std::cout << "CHANNEL" << ch_iter->first << std::endl;
+				topic = ch_iter->second.getTopic().substr(1);
+				std::string count = SSTR(ch_iter->second.getUserCount());
+				ret += "322 " + ch_iter->first.substr(1) + " " + "#" + count + " " + topic + "\r\n";
+			}
+		}
+	}
+	ret += "323 :End of LIST\r\n";
+	return (ret);
 }
 
 std::string Server::KickCmd(std::stringstream &stream, User &user)
 {
-	(void) user;
 	std::string									channel_str;
 	std::string									user_str;
 	std::string									ret;
@@ -451,7 +481,7 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 	std::stringstream							channels_stream;
 	std::stringstream							users_stream;
 	std::stringstream							part_stream;
-	std::list<User>::iterator					user_iter;
+	std::map<User *, bool>::pointer				user_ptr;
 	std::map<std::string, Channel>::iterator	channel_iter;
 	std::map<User *, bool>::pointer				ch_user_ptr;
 
@@ -484,25 +514,19 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 			ret += "482 " + channel_str + " :You're not channel operator\r\n";
 			continue;
 		}
-		user_iter = users.begin();
-		while (user_iter != users.end())
-		{
-			if (user_iter->getNick() == user_str)
-				break;
-			++user_iter;
-		}
-		if (user_iter == users.end())
+		user_ptr = channel_iter->second.findUser(user_str);
+		if (user_ptr != NULL)
 		{
 			ret += "441 " + user_str + " " + channel_str + " :They aren't on that channel\r\n";
 			continue;
 		}
 		channel_iter->second.sendToAll(":" + user.getNick() + " KICK " + channel_str + " " + user_str + " " + reason + "\r\n", &user);
 		ret += ":" + user.getNick() + " KICK " + channel_str + " " + user_str + " " + reason + "\r\n";
-		user.leaveChannel(&(*channel_iter));
+		user_ptr->first->leaveChannel(&(*channel_iter));
 		if (channel_iter->second.getUserCount() == 1)
 			channels.erase(channel_iter);
 		else
-			channel_iter->second.removeUser(&(*user_iter));
+			channel_iter->second.removeUser(user_ptr->first);
 	}
 	return (ret);
 }
@@ -536,6 +560,7 @@ std::string Server::PrivmsgCmd(std::stringstream &stream, User &user)
 			{
 				if (user_iter->getNick() == recipent)
 				{
+					std::cout << "NICK" << user_iter->getNick() << " " << users.size() << std::endl;
 					user_iter->sendMsg(":" + user.getNick() + " PRIVMSG " + recipent + " " + msg + "\r\n");
 					break;
 				}

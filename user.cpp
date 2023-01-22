@@ -10,6 +10,11 @@ User::~User()
 
 }
 
+void User::closeFd()
+{
+	close(fd_);
+}
+
 std::string User::getNick()
 {
 	return (nick_);

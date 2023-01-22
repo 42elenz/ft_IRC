@@ -5,6 +5,18 @@
 #include <map>
 #include "user.hpp"
 #include "channel.hpp"
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <iostream>
+#include <sstream>
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <poll.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sstream>
+#define SSTR( x ) static_cast< std::ostringstream & >( \
+        ( std::ostringstream() << std::dec << x ) ).str()
 
 class Server
 {
