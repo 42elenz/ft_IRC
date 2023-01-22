@@ -33,6 +33,8 @@ class User
 		void setReal(std::string real);
 		std::string getFail();
 		void setFail(std::string nick);
+		std::vector<std::map<std::string, Channel>::pointer>::iterator get_channels_begin();
+		std::vector<std::map<std::string, Channel>::pointer>::iterator get_channels_end();
 		void joinChannel(std::map<std::string, Channel>::pointer channel_ptr);
 		void leaveChannel(std::map<std::string, Channel>::pointer channel_ptr);
 		void sendMsg(const std::string &msg);

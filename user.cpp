@@ -98,6 +98,19 @@ std::map<std::string, Channel>::pointer User::findChannel(const std::string &cha
 	return(NULL);
 }
 
+std::vector<std::map<std::string, Channel>::pointer>::iterator User::get_channels_begin()
+{
+	std::vector<std::map<std::string, Channel>::pointer>::iterator iter;
+	iter = channels.begin();
+	return (iter);
+}
+
+std::vector<std::map<std::string, Channel>::pointer>::iterator User::get_channels_end()
+{
+	std::vector<std::map<std::string, Channel>::pointer>::iterator iter;
+	iter = channels.end();
+	return (iter);
+}
 void User::setPasswd()
 {
 	passwd = true;

@@ -267,11 +267,29 @@ std::string Server::JoinCmd(std::stringstream &stream, User &user)
 {
 	std::string str;
 	std::string ret;
+	std::string part_str;
+	std::stringstream part;
 	std::map<std::string, Channel>::pointer channel_ptr;
+	std::vector<std::map<std::string, Channel>::pointer>::iterator iter;
+	std::vector<std::map<std::string, Channel>::pointer>::iterator iter_end;
 
 	if (std::getline(stream, str, ' ') == NULL)
 		return ("461 JOIN :Not enough parameters\r\n");
-	// if ()
+	if (str[0] == '0')
+	{
+		iter = user.get_channels_begin();
+		iter_end = user.get_channels_end();
+		while(iter != iter_end)
+		{
+			std::cout << "STRING" << (*iter)->first <<std::endl;
+			part_str = (*iter)->first;
+			part_str += " :WeeChat 3.8";
+			part << part_str;
+			ret += PartCmd(part, user);
+			iter++;
+		}
+		return (ret);
+	}
 	stream.clear();
 	stream.str(str);
 	while (std::getline(stream, str, ',') != NULL)
