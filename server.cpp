@@ -57,17 +57,19 @@ void Server::StartServer()
 	while(1)
 	{
 		std::cout << "\nPoll. Channels: " << channels.size() << " Users: " << users.size() <<std::endl;
-		if (poll(&(*pfds.begin()), pfds.size(), -1) == -1)
+		if (pfds.empty() || poll(&(*pfds.begin()), pfds.size(), -1) <= 0)
 		{
 			perror("Poll");
 			return;
 		}
+		std::cout<<"ERROR1 "<< pfds.size() << std::endl;
 		if (pfds[0].revents == POLLIN)
 		{
 			pfds.push_back(pollfd());
 			pfds.back().fd = accept(this->socketfd, NULL, NULL);
 			if (fcntl(pfds.back().fd, F_SETFL, O_NONBLOCK) == -1)
 			{
+				std::cout<<"ERROR2"<<std::endl;
 				perror("Fcntl");
 				return;
 			}
@@ -77,6 +79,7 @@ void Server::StartServer()
 		}
 		else
 		{
+			std::cout<< "in loop" <<std::endl;
 			pfd_iter = ++(pfds.begin());
 			user_iter = users.begin();
 
@@ -84,14 +87,20 @@ void Server::StartServer()
 			{
 				if (pfd_iter->revents == POLLIN)
 				{
+					std::cout<< "POLLIN" <<std::endl;
 					reply = Recieve(pfd_iter->fd, *user_iter);
 					if (reply == "USERREMOVED")
+					{
+					std::cout<< "USERREMOVED" <<std::endl;
+
 						continue;
+					}
 					if (reply != "")
 						Send(pfd_iter->fd, reply);
 				}
 				else if (pfd_iter->revents != 0)
 				{
+					std::cout<< "pfd_iter->revents != 0" <<std::endl;
 					RemoveUser(pfd_iter, user_iter);
 					continue;
 				}
@@ -105,20 +114,27 @@ void Server::StartServer()
 void Server::RemoveUser(std::vector<struct pollfd>::iterator &pfd_iter, std::list<User>::iterator &user_iter)
 {
 	std::map<std::string, Channel>::iterator	channel_iter;
+	std::map<std::string, Channel>::iterator	channel_iter_end;
 
 	close(pfd_iter->fd);
 	pfds.erase(pfd_iter);
 	channel_iter = channels.begin();
-	while (channel_iter != channels.end())
+	channel_iter_end = channels.end();
+	while (channel_iter != channel_iter_end && (!channels.empty()))//to prevent seqfaults empty check
 	{
 		if (channel_iter->second.findUser(user_iter->getNick()) != NULL)
 		{
 			if (channel_iter->second.getUserCount() == 1)
+			{
 				channels.erase(channel_iter);
+			}
 			else
+			{
 				channel_iter->second.removeUser(&(*user_iter));
+			}
 		}
-		++channel_iter;
+		if(!channels.empty()) //to prevent seqfaults empty check
+			++channel_iter;
 	}
 	users.erase(user_iter);
 }
@@ -281,9 +297,10 @@ std::string Server::JoinCmd(std::stringstream &stream, User &user)
 		iter_end = user.get_channels_end();
 		while(iter != iter_end)
 		{
-			std::cout << "STRING" << (*iter)->first <<std::endl;
+			std::cout << "STRING " << (*iter)->first <<std::endl;
 			part_str = (*iter)->first;
 			part_str += " :WeeChat 3.8";
+			part.clear();
 			part << part_str;
 			ret += PartCmd(part, user);
 			iter++;
@@ -333,7 +350,10 @@ std::string Server::PartCmd(std::stringstream &stream, User &user)
 	std::map<std::string, Channel>::iterator	channel_iter;
 
 	if (std::getline(stream, str, ' ') == NULL)
+	{
+		std::cout << "STREAM"<<str << std::endl;
 		return ("461 PART :Not enough parameters\r\n");
+	}
 	if (std::getline(stream, msg, '\0') != NULL && msg[0] == ':')
 		msg = " " + msg;
 	else
