@@ -42,7 +42,7 @@ class Server
 		std::string PassCmd(std::stringstream &stream, User &user);
 		std::string NickCmd(std::stringstream &stream, User &user);
 		std::string UserCmd(std::stringstream &stream, User &user);
-		std::string OuitCmd();
+		std::string OuitCmd(std::stringstream &stream, User &user);
 		std::string JoinCmd(std::stringstream &stream, User &user);
 		std::string PingCmd();
 		std::string PartCmd(std::stringstream &stream, User &user);

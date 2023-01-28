@@ -190,7 +190,7 @@ std::string Server::Command(const std::string &cmd, User &user)
 	else if (str == "USER")
 		return UserCmd(stream, user);
 	else if (str == "QUIT")
-		return OuitCmd();
+		return OuitCmd(stream, user);
 	else if (str == "JOIN")
 		return JoinCmd(stream, user);
 	else if (str == "PING")
@@ -274,8 +274,17 @@ std::string Server::UserCmd(std::stringstream &stream, User &user)
 	return (":localhost 001 " + user.getNick() + " :Welcome to the Internet Relay Network " + user.getNick() + "!" + user.getUser() + "@localhost\r\n");
 }
 
-std::string Server::OuitCmd()
+std::string Server::OuitCmd(std::stringstream &stream, User &user)
 {
+	std::vector<std::map<std::string, Channel>::pointer>::iterator iter;
+	std::vector<std::map<std::string, Channel>::pointer>::iterator iter_end;
+
+	iter = user.get_channels_begin();
+	iter_end = user.get_channels_end();
+	while(iter != iter_end)
+	{
+		//SEND PRIVMSG IN ALL CHANNELS THE USER IS IN
+	}
 	return ("ERROR :terminating client connection\r\n");
 }
 
