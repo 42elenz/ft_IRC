@@ -62,14 +62,12 @@ void Server::StartServer()
 			perror("Poll");
 			return;
 		}
-		std::cout<<"ERROR1 "<< pfds.size() << std::endl;
 		if (pfds[0].revents == POLLIN)
 		{
 			pfds.push_back(pollfd());
 			pfds.back().fd = accept(this->socketfd, NULL, NULL);
 			if (fcntl(pfds.back().fd, F_SETFL, O_NONBLOCK) == -1)
 			{
-				std::cout<<"ERROR2"<<std::endl;
 				perror("Fcntl");
 				return;
 			}
@@ -79,7 +77,6 @@ void Server::StartServer()
 		}
 		else
 		{
-			std::cout<< "in loop" <<std::endl;
 			pfd_iter = ++(pfds.begin());
 			user_iter = users.begin();
 
@@ -92,7 +89,6 @@ void Server::StartServer()
 					if (reply == "USERREMOVED")
 					{
 					std::cout<< "USERREMOVED" <<std::endl;
-
 						continue;
 					}
 					if (reply != "")
@@ -100,7 +96,6 @@ void Server::StartServer()
 				}
 				else if (pfd_iter->revents != 0)
 				{
-					std::cout<< "pfd_iter->revents != 0" <<std::endl;
 					RemoveUser(pfd_iter, user_iter);
 					continue;
 				}
@@ -276,16 +271,26 @@ std::string Server::UserCmd(std::stringstream &stream, User &user)
 
 std::string Server::OuitCmd(std::stringstream &stream, User &user)
 {
-	std::vector<std::map<std::string, Channel>::pointer>::iterator iter;
-	std::vector<std::map<std::string, Channel>::pointer>::iterator iter_end;
+	std::vector<std::map<std::string, Channel>::pointer>::iterator ch_iter;
+	std::vector<std::map<std::string, Channel>::pointer>::iterator ch_iter_end;
+	std::string 													pm_str;
+	std::string 													msg;
+	std::string														ret;
+	std::stringstream												msg_stream;
 
-	iter = user.get_channels_begin();
-	iter_end = user.get_channels_end();
-	while(iter != iter_end)
+	ch_iter = user.get_channels_begin();
+	ch_iter_end = user.get_channels_end();
+	std::getline(stream, msg);
+	if (msg[1] == ':')
+		msg = msg.substr(1);
+	while(ch_iter != ch_iter_end)
 	{
-		//SEND PRIVMSG IN ALL CHANNELS THE USER IS IN
+		pm_str = user.getNick() + " quitted server :" + msg;
+		(*ch_iter)->second.sendToAll(":" + user.getNick() + " PRIVMSG " + (*ch_iter)->first + " " + pm_str + "\r\n", &user);
+		ch_iter++;
 	}
-	return ("ERROR :terminating client connection\r\n");
+	ret += "ERROR :terminating client connection\r\n";
+	return (ret);
 }
 
 std::string Server::JoinCmd(std::stringstream &stream, User &user)
@@ -306,7 +311,6 @@ std::string Server::JoinCmd(std::stringstream &stream, User &user)
 		iter_end = user.get_channels_end();
 		while(iter != iter_end)
 		{
-			std::cout << "STRING " << (*iter)->first <<std::endl;
 			part_str = (*iter)->first;
 			part_str += " :WeeChat 3.8";
 			part.clear();
@@ -360,7 +364,6 @@ std::string Server::PartCmd(std::stringstream &stream, User &user)
 
 	if (std::getline(stream, str, ' ') == NULL)
 	{
-		std::cout << "STREAM"<<str << std::endl;
 		return ("461 PART :Not enough parameters\r\n");
 	}
 	if (std::getline(stream, msg, '\0') != NULL && msg[0] == ':')
@@ -484,8 +487,6 @@ std::string Server::ListCmd(std::stringstream &stream, User &user)
 	std::map<std::string, Channel>::iterator ch_iter;
 
 	std::getline(stream, str, ' ');
-	std::cout<<"STUFF" << str << std::endl;
-	std::cout<<"LENGT" << str.length() << std::endl;
 	if (str.length() == 0)
 	{
 		for(ch_iter = channels.begin(); ch_iter != channels.end(); ch_iter++)
@@ -499,17 +500,15 @@ std::string Server::ListCmd(std::stringstream &stream, User &user)
 	}
 	else
 	{
-		std::cout << "THATS TEH STRING BEFORE" << str <<std::endl;
 		channels_stream << str;
-		std::cout << "THATS TEH STRING AFTER" << str <<std::endl;
 		while(std::getline(channels_stream, channel, ','))
 		{
 			ch_iter = channels.find(channel);
-			std::cout << "THATS TEH STRING " << channel <<std::endl;
 			if(ch_iter != channels.end())
 			{
-				std::cout << "CHANNEL" << ch_iter->first << std::endl;
 				topic = ch_iter->second.getTopic().substr(1);
+				if (topic.length() == 0)
+					topic = ":";
 				std::string count = SSTR(ch_iter->second.getUserCount());
 				ret += "322 " + ch_iter->first.substr(1) + " " + "#" + count + " " + topic + "\r\n";
 			}
