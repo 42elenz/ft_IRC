@@ -32,7 +32,7 @@ std::map<User *, bool>::pointer Channel::findUser(std::string user)
 			return (&(*iter));
 		iter++;
 	}
-	return (nullptr);
+	return (NULL);
 }
 
 void Channel::sendToAll(const std::string &msg, User *user)
