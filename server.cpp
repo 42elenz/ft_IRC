@@ -56,7 +56,7 @@ void Server::StartServer()
 	pfds[0].events = POLLIN;
 	while(1)
 	{
-		std::cout << "\nPoll. Channels: " << channels.size() << " Users: " << users.size() <<std::endl;
+		std::cout << "POLL" << std::endl;
 		if (pfds.empty() || poll(&(*pfds.begin()), pfds.size(), -1) <= 0)
 		{
 			perror("Poll");
@@ -88,7 +88,6 @@ void Server::StartServer()
 					reply = Recieve(pfd_iter->fd, *user_iter);
 					if (reply == "USERREMOVED")
 					{
-					std::cout<< "USERREMOVED" <<std::endl;
 						continue;
 					}
 					if (reply != "")
@@ -214,13 +213,12 @@ std::string Server::PassCmd(std::stringstream &stream, User &user)
 	(void) user;
 	if (std::getline(stream, str, ' ') == NULL)
 		return ("461 PASS :Not enough parameters\r\n");
-	std::cout << str << " " << password << std::endl;
 	if (str == password)
 	{
 		user.setPasswd();
 		return ("");
 	}
-	return ("464 :Password incorrect\r\n");
+	return ("464 PASS :Password incorrect\r\n");
 }
 
 std::string Server::NickCmd(std::stringstream &stream, User &user)
@@ -476,6 +474,7 @@ std::string Server::TopicCmd(std::stringstream &stream, User &user)
 			return ("482 " + channel_ptr->first + " :You're not channel operator\r\n");
 		channel_ptr->second.setTopic(str);
 		channel_ptr->second.sendToAll(":" + user.getNick() + " TOPIC " + channel_ptr->first + " " + channel_ptr->second.getTopic() + "\r\n", &user);
+		user.sendMsg(":" + user.getNick() + " TOPIC " + channel_ptr->first + " " + channel_ptr->second.getTopic() + "\r\n");
 		return ("");
 	}
 }
@@ -565,7 +564,6 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 			continue;
 		}
 		user_ptr = channel_iter->second.findUser(user_str);
-		std::cout << "stream:   " << users_stream.str() << " : " << user_str << "!" << std::endl;
 		if (user_ptr == NULL)
 		{
 			ret += "441 " + user_str + " " + channel_str + " :They aren't on that channel\r\n";
@@ -611,7 +609,6 @@ std::string Server::PrivmsgCmd(std::stringstream &stream, User &user)
 			{
 				if (user_iter->getNick() == recipent)
 				{
-					std::cout << "NICK" << user_iter->getNick() << " " << users.size() << std::endl;
 					user_iter->sendMsg(":" + user.getNick() + " PRIVMSG " + recipent + " " + msg + "\r\n");
 					break;
 				}
