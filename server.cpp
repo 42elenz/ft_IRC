@@ -402,51 +402,55 @@ std::string Server::ModeCmd(std::stringstream &stream, User &user)
 	if (std::getline(stream, channel_str, ' ') == NULL || !(channel_str[0] == '#' || channel_str[0] == '&' || channel_str[0] == '!' || channel_str[0] == '+'))
 		return ("461 MODE :Not enough parameters\r\n");
 	channel_ptr = user.findChannel(channel_str);
+	if (channel_ptr == NULL)
+		return ("441 " + param_str + " " + channel_str + " :You aren't on the channel\r\n");
 	if (channel_str[0] == '+')
 		return ("477 " + channel_str + " :Channel doesn't support modes\r\n");
-	if (stream.str().find(' ') != std::string::npos)
+	if (std::getline(stream, mode_str, ' ') == NULL)
 	{
 		if (channel_ptr->second.isUserChannelOperator(&user) == false)
 			return ("324 " + channel_str + " -m -o " + user.getNick() + "\r\n");
 		else
 			return ("324 " + channel_str + " -m +o " + user.getNick() + "\r\n");
 	}
-	while (std::getline(stream, mode_str, ' ') != NULL)
+	if (!channel_ptr->second.isUserChannelOperator(&user))
+		return("482 " + channel_str + " :You're not channel operator\r\n");
+	while (1)
 	{
 		if (mode_str == "+t")
 			channel_ptr->second.setFlagT(true);
 		else if (mode_str == "-t")
 			channel_ptr->second.setFlagT(false);
-		else if (mode_str == "-o" && std::getline(stream, param_str, ' ') != NULL)
+		else if (mode_str == "-o" && std::getline(stream, param_str, ' '))
 		{
-			if (param_str == user.getNick())
-				channel_ptr->second.setUserChannelOperator(&user, false);
+			user_ptr = channel_ptr->second.findUser(param_str);
+			if (user_ptr == NULL)
+				user.sendMsg("441 " + param_str + " " + channel_str + " :They aren't on that channel\r\n");
 			else
 			{
-				user_ptr = channel_ptr->second.findUser(param_str);
-				if (user_ptr == NULL)
-					return ("441 " + param_str + " " + channel_str + " :They aren't on that channel\r\n");
-				else
-					user_ptr->second = false;
+				user_ptr->second = false;
+				channel_ptr->second.sendToAll(":localhost MODE " + channel_str + " " + mode_str + " " + param_str + "\r\n", &user);
+				user.sendMsg(":localhost MODE " + channel_str + " " + mode_str + " " + param_str + "\r\n");
 			}
 		}
-		else if (mode_str == "+o" && std::getline(stream, param_str, ' ') != NULL && channel_ptr->second.isUserChannelOperator(&user))
+		else if (mode_str == "+o" && std::getline(stream, param_str, ' '))
 		{
-			if (param_str == user.getNick())
-				channel_ptr->second.setUserChannelOperator(&user, true);
+			user_ptr = channel_ptr->second.findUser(param_str);
+			if (user_ptr == NULL)
+				user.sendMsg("441 " + param_str + " " + channel_str + " :They aren't on that channel\r\n");
 			else
 			{
-				user_ptr = channel_ptr->second.findUser(param_str);
-				if (user_ptr == NULL)
-					return ("441 " + param_str + " " + channel_str + " :They aren't on that channel\r\n");
-				else
-					user_ptr->second = true;
+				user_ptr->second = true;
+				channel_ptr->second.sendToAll(":localhost MODE " + channel_str + " " + mode_str + " " + param_str + "\r\n", &user);
+				user.sendMsg(":localhost MODE " + channel_str + " " + mode_str + " " + param_str + "\r\n");
 			}
 		}
 		else
-			return ("472 " + mode_str + " " + param_str + " :is unknown to me\r\n");
+			user.sendMsg("472 " + mode_str + " :is unknown to me\r\n");
+		if (std::getline(stream, mode_str, ' ') == NULL)
+			break;
 	}
-	return ("324 " + channel_str + " " + mode_str + " " + param_str + "\r\n");
+	return ("");
 }
 
 std::string Server::TopicCmd(std::stringstream &stream, User &user)
@@ -561,7 +565,8 @@ std::string Server::KickCmd(std::stringstream &stream, User &user)
 			continue;
 		}
 		user_ptr = channel_iter->second.findUser(user_str);
-		if (user_ptr != NULL)
+		std::cout << "stream:   " << users_stream.str() << " : " << user_str << "!" << std::endl;
+		if (user_ptr == NULL)
 		{
 			ret += "441 " + user_str + " " + channel_str + " :They aren't on that channel\r\n";
 			continue;
