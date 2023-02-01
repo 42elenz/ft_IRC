@@ -242,7 +242,15 @@ std::string Server::NickCmd(std::stringstream &stream, User &user)
 	old_nick = user.getNick();
 	user.setNick(str);
 	if (old_nick != "")
-		return (":" + old_nick + " NICK " + str + "\r\n");
+	{
+		user_iter = users.begin();
+		while (user_iter != users.end())
+		{
+			user_iter->sendMsg(":" + old_nick + " NICK " + str + "\r\n");
+			++user_iter;
+		}
+		return ("");
+	}
 	if (user.getFail() != "" && user.getNick() == "")
 		old_nick = (":" + user.getFail() + " NICK " + str + "\r\n");
 	if (user.getUser() == "")
